@@ -48,8 +48,77 @@ let t; F.addEventListener('input',()=>{clearTimeout(t);t=setTimeout(()=>save(),3
 function updateUI(){document.getElementById('operadorBox').style.display=F.elements.televisado.checked?'block':'none';document.getElementById('hibridoBox').style.display=F.elements.hibrido.checked?'block':'none';document.getElementById('riegoSi').style.display=F.elements.acuerdo_riego.checked?'block':'none';document.getElementById('riegoNo').style.display=F.elements.acuerdo_riego.checked?'none':'block'}
 F.addEventListener('change',updateUI);
 document.getElementById('saveBtn').onclick=e=>{e.preventDefault();save('Borrador guardado')};
-function lines(){const d=serialize(), out=[];const add=(h,v)=>{if(v!==''&&v!==false&&v!=null)out.push(`${h}: ${v===true?'Sí':v}`)};out.push('INFORME DFP · PRIMERA FEDERACIÓN 2026/27','');add('Equipo local',d.equipo_local);add('Equipo visitante',d.equipo_visitante);add('Fecha',d.fecha);add('Inicio 1ª parte',d.inicio_1);add('Inicio 2ª parte',d.inicio_2);add('Contacto club local',d.contacto_local);add('Contacto club visitante',d.contacto_visitante);add('Partido televisado',d.televisado?'Sí':'No');if(d.televisado)add('Operador audiovisual',d.operador);add('Espectadores',d.espectadores);add('Espectadores visitantes',d.espectadores_visitantes);add('Resultado descanso',d.resultado_descanso);add('Resultado final',d.resultado_final);add('Resultado prórroga',d.resultado_prorroga);add('Tanda de penaltis',d.penaltis);out.push('\nESTADO DEL TERRENO DE JUEGO');add('Meteorología 24h',d.meteo_24);add('Previsión',d.meteo_hora);add('Dimensiones',d.largo&&d.ancho?`${d.largo} x ${d.ancho} m`:'');add('Clase de césped',d.clase_cesped);add('Césped híbrido',d.hibrido?'Sí':'No');if(d.hibrido)add('Tipo de hibridez',d.tipo_hibridez);add('Acuerdo sobre riego',d.acuerdo_riego?'Sí':'No');['cobertura','mala_hierba','clima','altura','marcaje','postes','redes_limpias','redes_estado','banderines','limpieza'].forEach(k=>add(k.replaceAll('_',' '),d[k]));add('Observaciones terreno',d.observaciones_terreno);out.push('\nMARKETING');marketing.forEach((x,i)=>{add(x.text,d['mkt_'+i]?'Sí':'No')});add('Observaciones Marketing',d.observaciones_marketing);out.push('\nPRODUCCIÓN AUDIOVISUAL');tvSections.forEach((sec,si)=>{out.push('\n'+sec.title);sec.items.forEach((it,ii)=>add(it[0],d[`tv_${si}_${ii}`]))});add('Observaciones Producción Audiovisual',d.observaciones_tv);out.push('\nOTRAS CUESTIONES RELEVANTES');out.push(d.otras_cuestiones||'Sin incidencias registradas.');return out.join('\n')}
-async function shareReport(){save('Informe final guardado');const text=lines();const blob=new Blob([text],{type:'text/plain;charset=utf-8'});const file=new File([blob],`DFP_${(F.elements.fecha.value||'partido')}_${(F.elements.equipo_local.value||'local').replaceAll(' ','-')}_${(F.elements.equipo_visitante.value||'visitante').replaceAll(' ','-')}.txt`,{type:'text/plain'});if(navigator.share&&navigator.canShare?.({files:[file]})){await navigator.share({title:'Informe DFP',text:'Enviar a fran.liarte@gmail.com',files:[file]})}else{const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=file.name;a.click();alert('Informe generado. En esta primera versión se ha descargado como texto. El siguiente bloque lo convertirá a PDF y habilitará compartir.') }}
+function reportRows(){
+ const d=serialize(), rows=[];
+ const section=t=>rows.push({type:'section',text:t});
+ const add=(h,v)=>{if(v!==''&&v!=null)rows.push({type:'row',label:h,value:v===true?'Sí':v===false?'No':String(v)})};
+ rows.push({type:'title',text:'INFORME DFP - PRIMERA FEDERACIÓN 2026/27'});
+ section('INFORMACIÓN GENERAL DEL PARTIDO');
+ add('Equipo local',d.equipo_local); add('Equipo visitante',d.equipo_visitante); add('Fecha',d.fecha);
+ add('Inicio 1ª parte',d.inicio_1); add('Inicio 2ª parte',d.inicio_2); add('Contacto club local',d.contacto_local); add('Contacto club visitante',d.contacto_visitante);
+ add('Partido televisado',d.televisado?'Sí':'No'); if(d.televisado)add('Operador audiovisual',d.operador);
+ add('Espectadores',d.espectadores); add('Espectadores visitantes',d.espectadores_visitantes); add('Resultado descanso',d.resultado_descanso); add('Resultado final',d.resultado_final); add('Resultado prórroga',d.resultado_prorroga); add('Tanda de penaltis',d.penaltis);
+ section('ESTADO DEL TERRENO DE JUEGO');
+ add('Meteorología 24h',d.meteo_24); add('Previsión hora del partido',d.meteo_hora); add('Largo del terreno (m)',d.largo); add('Ancho del terreno (m)',d.ancho); add('Clase de césped',d.clase_cesped);
+ add('Césped híbrido',d.hibrido?'Sí':'No'); if(d.hibrido)add('Tipo de hibridez',d.tipo_hibridez);
+ add('Acuerdo sobre riego',d.acuerdo_riego?'Sí':'No');
+ if(d.acuerdo_riego){add('Regado antes del partido',d.riego_antes?'Sí':'No');add('Regado durante el descanso',d.riego_descanso?'Sí':'No');add('Riego equitativo',d.riego_equitativo?'Sí':'No');}
+ else {add('Sin riego desde una hora antes',d.no_riego_hora?'Sí':'No');add('Sin riego durante el descanso',d.no_riego_descanso?'Sí':'No');}
+ add('Cobertura vegetal',d.cobertura); add('Mala hierba',d.mala_hierba); add('Tipo de clima',d.clima); add('Altura / desviación',d.altura); add('Marcaje',d.marcaje); add('Postes y larguero limpios',d.postes); add('Redes limpias',d.redes_limpias); add('Redes en perfecto estado',d.redes_estado); add('Banderines',d.banderines); add('Limpieza general',d.limpieza); add('Observaciones terreno',d.observaciones_terreno);
+ section('MARKETING - IMAGEN CORPORATIVA RFEF');
+ marketing.forEach((x,i)=>add(x.text,d['mkt_'+i]?'Sí':'No')); add('Observaciones Marketing',d.observaciones_marketing);
+ section('PRODUCCIÓN AUDIOVISUAL');
+ tvSections.forEach((sec,si)=>{rows.push({type:'subsection',text:sec.title});sec.items.forEach((it,ii)=>add(it[0],d[`tv_${si}_${ii}`]||'Sin responder'))}); add('Observaciones Producción Audiovisual',d.observaciones_tv);
+ section('OTRAS CUESTIONES RELEVANTES');
+ add('Incidencias / observaciones',d.otras_cuestiones||'Sin incidencias registradas.');
+ rows.push({type:'note',text:'Las fotografías adjuntas permanecen almacenadas localmente en el dispositivo y no se incluyen en este PDF.'});
+ return rows;
+}
+function pdfSafe(s){return String(s??'').replaceAll('≥','>=').replaceAll('≤','<=').replaceAll('–','-').replaceAll('—','-').replaceAll('’',"'").replaceAll('“','"').replaceAll('”','"').replace(/[\u0100-\uFFFF]/g,'?')}
+function pdfEsc(s){return pdfSafe(s).replace(/\\/g,'\\\\').replace(/\(/g,'\\(').replace(/\)/g,'\\)')}
+function wrapText(text,max=88){const paras=String(text??'').split(/\r?\n/),out=[];for(const para of paras){const words=para.split(/\s+/).filter(Boolean);if(!words.length){out.push('');continue}let line='';for(const w of words){if((line+' '+w).trim().length>max&&line){out.push(line);line=w}else line=(line+' '+w).trim()}if(line)out.push(line)}return out}
+function latin1Bytes(str){const a=new Uint8Array(str.length);for(let i=0;i<str.length;i++){let c=str.charCodeAt(i);a[i]=c<=255?c:63}return a}
+function buildPdfBlob(){
+ const rows=reportRows(), pages=[]; let page=[], y=800;
+ const pushPage=()=>{if(page.length)pages.push(page);page=[];y=800};
+ const text=(x,size,s,bold=false)=>{if(y<55)pushPage();page.push({x,y,size,s:pdfEsc(s),bold});y-=size+5};
+ const gap=n=>{y-=n;if(y<55)pushPage()};
+ rows.forEach(r=>{
+  if(r.type==='title'){text(42,16,r.text,true);gap(8);return}
+  if(r.type==='section'){gap(8);text(42,12,r.text,true);gap(3);return}
+  if(r.type==='subsection'){gap(4);text(48,10,r.text,true);return}
+  if(r.type==='note'){gap(10);wrapText(r.text,92).forEach(l=>text(42,8,l,false));return}
+  const prefix=r.label+': '; const firstMax=Math.max(35,88-prefix.length); const vals=wrapText(r.value,firstMax);
+  if(!vals.length) vals.push('');
+  text(48,9,prefix+vals[0],false); for(let i=1;i<vals.length;i++)text(58,9,vals[i],false);
+ });
+ pushPage();
+ const objs=[]; const addObj=s=>{objs.push(s);return objs.length};
+ const font=addObj('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>');
+ const fontB=addObj('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>');
+ const pageIds=[], contentIds=[];
+ pages.forEach(pg=>{const stream=pg.map(t=>`BT /${t.bold?'F2':'F1'} ${t.size} Tf 1 0 0 1 ${t.x} ${t.y} Tm (${t.s}) Tj ET`).join('\n');const cid=addObj(`<< /Length ${latin1Bytes(stream).length} >>\nstream\n${stream}\nendstream`);contentIds.push(cid);pageIds.push(addObj('PENDING'))});
+ const pagesId=addObj('PAGES_PENDING');
+ pageIds.forEach((pid,i)=>objs[pid-1]=`<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 ${font} 0 R /F2 ${fontB} 0 R >> >> /Contents ${contentIds[i]} 0 R >>`);
+ objs[pagesId-1]=`<< /Type /Pages /Kids [${pageIds.map(id=>id+' 0 R').join(' ')}] /Count ${pageIds.length} >>`;
+ const catalog=addObj(`<< /Type /Catalog /Pages ${pagesId} 0 R >>`);
+ let chunks=['%PDF-1.4\n%âãÏÓ\n'], offsets=[0], pos=latin1Bytes(chunks[0]).length;
+ objs.forEach((o,i)=>{offsets.push(pos);const c=`${i+1} 0 obj\n${o}\nendobj\n`;chunks.push(c);pos+=latin1Bytes(c).length});
+ const xref=pos;let tail=`xref\n0 ${objs.length+1}\n0000000000 65535 f \n`;for(let i=1;i<offsets.length;i++)tail+=String(offsets[i]).padStart(10,'0')+' 00000 n \n';tail+=`trailer\n<< /Size ${objs.length+1} /Root ${catalog} 0 R >>\nstartxref\n${xref}\n%%EOF`;
+ chunks.push(tail);const bytes=latin1Bytes(chunks.join(''));return new Blob([bytes],{type:'application/pdf'});
+}
+function cleanFilePart(s){return String(s||'').trim().replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ_-]+/g,'-').replace(/-+/g,'-').slice(0,45)||'partido'}
+async function shareReport(){
+ save('Informe final guardado');
+ const blob=buildPdfBlob();
+ const name=`DFP_${F.elements.fecha.value||'partido'}_${cleanFilePart(F.elements.equipo_local.value)}_${cleanFilePart(F.elements.equipo_visitante.value)}.pdf`;
+ const file=new File([blob],name,{type:'application/pdf'});
+ if(navigator.share&&navigator.canShare?.({files:[file]})){
+   await navigator.share({title:'Informe DFP',text:'Informe DFP para enviar a fran.liarte@gmail.com',files:[file]});
+ }else{
+   const a=document.createElement('a');const url=URL.createObjectURL(blob);a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);alert('PDF generado y descargado. Puedes adjuntarlo a un correo para fran.liarte@gmail.com.');
+ }
+}
 document.getElementById('confirmBtn').onclick=async e=>{e.preventDefault();if(confirm('¿Confirmar el informe y generar una copia para enviarla a fran.liarte@gmail.com? Los datos locales NO se borrarán.')){try{await shareReport()}catch(err){console.error(err)}}};
 try{restore(JSON.parse(localStorage.getItem('dfp_draft_v1')||'null'));const at=localStorage.getItem('dfp_saved_at');S.textContent=at?'🟢 Borrador recuperado · '+new Date(at).toLocaleTimeString('es-ES'):'🟢 Preparado · todavía sin datos';}catch(e){S.textContent='🟠 No se pudo recuperar el borrador'}updateUI();
 if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js').catch(console.error);
