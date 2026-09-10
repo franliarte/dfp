@@ -1,4 +1,4 @@
-const CACHE='dfp-v17';
+const CACHE='dfp-v18';
 const CORE=['./','./index.html','./app.js','./manifest.webmanifest'];
 
 self.addEventListener('install',event=>{

@@ -71,16 +71,16 @@ function reportRows(){
  tvSections.forEach((sec,si)=>{rows.push({type:'subsection',text:sec.title});sec.items.forEach((it,ii)=>add(it[0],d[`tv_${si}_${ii}`]||'Sin responder'))}); add('Observaciones Producción Audiovisual',d.observaciones_tv);
  section('OTRAS CUESTIONES RELEVANTES');
  add('Incidencias / observaciones',d.otras_cuestiones||'Sin incidencias registradas.');
- rows.push({type:'note',text:'Las fotografías adjuntas permanecen almacenadas localmente en el dispositivo y no se incluyen en este PDF.'});
+ rows.push({type:'note',text:'Las fotografías adjuntas se incluyen al final del PDF, agrupadas por su apartado correspondiente.'});
  return rows;
 }
 function pdfSafe(s){return String(s??'').replaceAll('≥','>=').replaceAll('≤','<=').replaceAll('–','-').replaceAll('—','-').replaceAll('’',"'").replaceAll('“','"').replaceAll('”','"').replace(/[\u0100-\uFFFF]/g,'?')}
 function pdfEsc(s){return pdfSafe(s).replace(/\\/g,'\\\\').replace(/\(/g,'\\(').replace(/\)/g,'\\)')}
 function wrapText(text,max=88){const paras=String(text??'').split(/\r?\n/),out=[];for(const para of paras){const words=para.split(/\s+/).filter(Boolean);if(!words.length){out.push('');continue}let line='';for(const w of words){if((line+' '+w).trim().length>max&&line){out.push(line);line=w}else line=(line+' '+w).trim()}if(line)out.push(line)}return out}
 function latin1Bytes(str){const a=new Uint8Array(str.length);for(let i=0;i<str.length;i++){let c=str.charCodeAt(i);a[i]=c<=255?c:63}return a}
-function buildPdfBlob(){
- const rows=reportRows(), pages=[]; let page=[], y=800;
- const pushPage=()=>{if(page.length)pages.push(page);page=[];y=800};
+async function buildPdfBlob(){
+ const rows=reportRows(), textPages=[]; let page=[], y=800;
+ const pushPage=()=>{if(page.length)textPages.push(page);page=[];y=800};
  const text=(x,size,s,bold=false)=>{if(y<55)pushPage();page.push({x,y,size,s:pdfEsc(s),bold});y-=size+5};
  const gap=n=>{y-=n;if(y<55)pushPage()};
  rows.forEach(r=>{
@@ -93,24 +93,73 @@ function buildPdfBlob(){
   text(48,9,prefix+vals[0],false); for(let i=1;i<vals.length;i++)text(58,9,vals[i],false);
  });
  pushPage();
- const objs=[]; const addObj=s=>{objs.push(s);return objs.length};
- const font=addObj('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>');
- const fontB=addObj('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>');
- const pageIds=[], contentIds=[];
- pages.forEach(pg=>{const stream=pg.map(t=>`BT /${t.bold?'F2':'F1'} ${t.size} Tf 1 0 0 1 ${t.x} ${t.y} Tm (${t.s}) Tj ET`).join('\n');const cid=addObj(`<< /Length ${latin1Bytes(stream).length} >>\nstream\n${stream}\nendstream`);contentIds.push(cid);pageIds.push(addObj('PENDING'))});
- const pagesId=addObj('PAGES_PENDING');
- pageIds.forEach((pid,i)=>objs[pid-1]=`<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 ${font} 0 R /F2 ${fontB} 0 R >> >> /Contents ${contentIds[i]} 0 R >>`);
- objs[pagesId-1]=`<< /Type /Pages /Kids [${pageIds.map(id=>id+' 0 R').join(' ')}] /Count ${pageIds.length} >>`;
- const catalog=addObj(`<< /Type /Catalog /Pages ${pagesId} 0 R >>`);
- let chunks=['%PDF-1.4\n%âãÏÓ\n'], offsets=[0], pos=latin1Bytes(chunks[0]).length;
- objs.forEach((o,i)=>{offsets.push(pos);const c=`${i+1} 0 obj\n${o}\nendobj\n`;chunks.push(c);pos+=latin1Bytes(c).length});
+
+ // Recuperar las fotos locales. Cada una se añadirá en una página propia,
+ // agrupada e identificada por el apartado al que pertenece.
+ if(!photoDB) await openPhotoDB();
+ const photoGroups=[
+  ['cesped','TERRENO DE JUEGO - Césped'],
+  ['marcaje','TERRENO DE JUEGO - Marcaje'],
+  ['porterias','TERRENO DE JUEGO - Porterías'],
+  ['banderines','TERRENO DE JUEGO - Banderines de córner'],
+  ['limpieza','TERRENO DE JUEGO - Limpieza general'],
+  ['observaciones_terreno','TERRENO DE JUEGO - Observaciones'],
+  ...marketing.filter(x=>x.evidence).map((x,i0)=>{const real=marketing.indexOf(x);return [`mkt_${real}`,`MARKETING - ${x.text}`]})
+ ];
+ const photoPages=[];
+ for(const [key,label] of photoGroups){
+   const photos=await getPhotos(key);
+   for(let i=0;i<photos.length;i++){
+     const blob=photos[i].blob;
+     let jpeg=blob;
+     // Garantiza JPEG válido para incrustarlo en el PDF.
+     if(blob.type!=='image/jpeg'){
+       const bmp=await createImageBitmap(blob);const c=document.createElement('canvas');c.width=bmp.width;c.height=bmp.height;c.getContext('2d').drawImage(bmp,0,0);bmp.close();jpeg=await new Promise(r=>c.toBlob(r,'image/jpeg',0.82));
+     }
+     const bmp=await createImageBitmap(jpeg); const w=bmp.width,h=bmp.height; bmp.close();
+     photoPages.push({label:`${label}${photos.length>1?` (${i+1}/${photos.length})`:''}`,bytes:new Uint8Array(await jpeg.arrayBuffer()),w,h});
+   }
+ }
+
+ const enc=s=>latin1Bytes(s);
+ const objs=[]; const addObj=body=>{objs.push(body);return objs.length};
+ const font=addObj(enc('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>'));
+ const fontB=addObj(enc('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>'));
+ const pageSpecs=[];
+ textPages.forEach(pg=>{
+   const stream=pg.map(t=>`BT /${t.bold?'F2':'F1'} ${t.size} Tf 1 0 0 1 ${t.x} ${t.y} Tm (${t.s}) Tj ET`).join('\n');
+   const cid=addObj(enc(`<< /Length ${enc(stream).length} >>\nstream\n${stream}\nendstream`));
+   pageSpecs.push({content:cid,image:null});
+ });
+ for(const ph of photoPages){
+   const imageHead=enc(`<< /Type /XObject /Subtype /Image /Width ${ph.w} /Height ${ph.h} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${ph.bytes.length} >>\nstream\n`);
+   const imageTail=enc('\nendstream');
+   const imageBytes=new Uint8Array(imageHead.length+ph.bytes.length+imageTail.length);imageBytes.set(imageHead);imageBytes.set(ph.bytes,imageHead.length);imageBytes.set(imageTail,imageHead.length+ph.bytes.length);
+   const iid=addObj(imageBytes);
+   const maxW=511,maxH=690,scale=Math.min(maxW/ph.w,maxH/ph.h,1);const dw=Math.round(ph.w*scale),dh=Math.round(ph.h*scale),x=Math.round((595-dw)/2),iy=70+Math.round((690-dh)/2);
+   const labelLines=wrapText(ph.label,78).slice(0,3);let cmd=`BT /F2 12 Tf 1 0 0 1 42 800 Tm (FOTOGRAFÍA ADJUNTA) Tj ET\n`;
+   labelLines.forEach((ln,i)=>cmd+=`BT /F1 9 Tf 1 0 0 1 42 ${780-i*13} Tm (${pdfEsc(ln)}) Tj ET\n`);
+   cmd+=`q ${dw} 0 0 ${dh} ${x} ${iy} cm /Im1 Do Q`;
+   const cid=addObj(enc(`<< /Length ${enc(cmd).length} >>\nstream\n${cmd}\nendstream`));
+   pageSpecs.push({content:cid,image:iid});
+ }
+ const pageIds=pageSpecs.map(()=>addObj(enc('PENDING')));
+ const pagesId=addObj(enc('PAGES_PENDING'));
+ pageSpecs.forEach((spec,i)=>{
+   const xobj=spec.image?` /XObject << /Im1 ${spec.image} 0 R >>`:'';
+   objs[pageIds[i]-1]=enc(`<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 ${font} 0 R /F2 ${fontB} 0 R >>${xobj} >> /Contents ${spec.content} 0 R >>`);
+ });
+ objs[pagesId-1]=enc(`<< /Type /Pages /Kids [${pageIds.map(id=>id+' 0 R').join(' ')}] /Count ${pageIds.length} >>`);
+ const catalog=addObj(enc(`<< /Type /Catalog /Pages ${pagesId} 0 R >>`));
+ const chunks=[enc('%PDF-1.4\n%âãÏÓ\n')], offsets=[0];let pos=chunks[0].length;
+ objs.forEach((body,i)=>{offsets.push(pos);const a=enc(`${i+1} 0 obj\n`),b=enc('\nendobj\n');chunks.push(a,body,b);pos+=a.length+body.length+b.length});
  const xref=pos;let tail=`xref\n0 ${objs.length+1}\n0000000000 65535 f \n`;for(let i=1;i<offsets.length;i++)tail+=String(offsets[i]).padStart(10,'0')+' 00000 n \n';tail+=`trailer\n<< /Size ${objs.length+1} /Root ${catalog} 0 R >>\nstartxref\n${xref}\n%%EOF`;
- chunks.push(tail);const bytes=latin1Bytes(chunks.join(''));return new Blob([bytes],{type:'application/pdf'});
+ chunks.push(enc(tail));return new Blob(chunks,{type:'application/pdf'});
 }
 function cleanFilePart(s){return String(s||'').trim().replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ_-]+/g,'-').replace(/-+/g,'-').slice(0,45)||'partido'}
 async function shareReport(){
  save('Informe final guardado');
- const blob=buildPdfBlob();
+ const blob=await buildPdfBlob();
  const name=`DFP_${F.elements.fecha.value||'partido'}_${cleanFilePart(F.elements.equipo_local.value)}_${cleanFilePart(F.elements.equipo_visitante.value)}.pdf`;
  const file=new File([blob],name,{type:'application/pdf'});
  if(navigator.share&&navigator.canShare?.({files:[file]})){
