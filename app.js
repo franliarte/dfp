@@ -1,0 +1,97 @@
+const F=document.getElementById('form'), S=document.getElementById('saveStatus');
+const marketing=[
+ {text:'Presencia de valla central estática en el centro de campo con logo de la competición',evidence:'Foto realizada'},
+ {text:'Presencia del logo de la competición en parte central de publicidad digital'},
+ {text:'Presencia y utilización de publimetas con la imagen de PRIMERA FEDERACIÓN junto a ambas porterías',evidence:'Foto realizada'},
+ {text:'Presencia de peana para balón a la salida del campo con logo de la competición',evidence:'Foto realizada'},
+ {text:'Presencia de trasera para entrevista Superflash con logo de la competición',evidence:'Foto realizada'},
+ {text:'Presencia de trasera para entrevista flash con logo de la competición',evidence:'Foto realizada'},
+ {text:'Presencia de trasera para entrevistas en zona mixta con logo de competición',evidence:'Foto realizada'},
+ {text:'Presencia de trasera en la sala de prensa con logo de la competición',evidence:'Foto realizada'},
+ {text:'Hoja de alineaciones oficial con logo de la competición',evidence:'Foto / papel disponible'},
+ {text:'Medios de comunicación y personal de la organización usan petos con el logo de la RFEF',evidence:'Foto realizada'},
+ {text:'Medios de comunicación y personal de la organización usan credencial oficial de la RFEF',evidence:'Foto / acreditación disponible'},
+];
+const tvSections=[
+ {title:'1. Aspectos generales posiciones de cámara',items:[
+  ['1.1 Master y fueras de juego misma altura',[['Cumple','Cumple'],['No cumple (-1)','No cumple (-1)']]],
+  ['1.2 Posiciones nivelada',[['Sí','Sí'],['No (-0,25)','No (-0,25)']]],
+  ['1.3 Posiciones sólidas y sin vibraciones',[['Sí','Sí'],['No (-1)','No (-1)']]],
+  ['1.4 Superficies lisas y antideslizantes',[['Sí','Sí'],['No (-0,25)','No (-0,25)']]],
+  ['1.5 Cubierta/protección frente a lluvia o sol',[['Sí','Sí'],['No (-0,5)','No (-0,5)']]],
+  ['1.6 Acceso seguro',[['Sí','Sí'],['No (-0,25)','No (-0,25)']]],
+  ['1.7 Visión completamente despejada',[['Sí','Sí'],['No (-1)','No (-1)']]],
+  ['1.8 Toma de corriente disponible',[['Sí','Sí'],['No (-0,5)','No (-0,5)']]],
+ ]},
+ {title:'2. Cámara master',items:[
+  ['2.1 Situada sobre la línea de medio campo',[['Sí','Sí'],['No (-1)','No (-1)']]],
+  ['2.2 Altura adecuada 12-15 grados',[['Sí','Sí'],['No (-0,25)','No (-0,25)']]],
+  ['2.3 Orientación adecuada, evita contraluz',[['Sí','Sí'],['No (-0,5)','No (-0,5)']]],
+  ['2.4 Dimensiones mínimas del practicable 4x2 m',[['Sí','Sí'],['No (-0,25)','No (-0,25)']]],
+ ]},
+ {title:'3. Cámaras de fuera de juego',items:[
+  ['3.1 Situadas a la altura de la línea del área de penalti',[['Sí','Sí'],['No (-1)','No (-1)']]],
+  ['3.2 Dimensiones mínimas del practicable 2x2 m',[['Sí','Sí'],['No (-0,25)','No (-0,25)']]],
+ ]},
+ {title:'4. Ocupación del estadio',items:[
+  ['4. Ocupación visible grada frente a cámara principal',[[ '< 40% (-2)','< 40% (-2)'],['>= 60% (0)','>= 60% (0)'],['Entre 40% y 59% (-1)','Entre 40% y 59% (-1)']]],
+ ]},
+];
+function radioBlock(name,text,options){return `<div class="sub"><b>${text}</b><div class="radios">${options.map(([label,value])=>`<label><input type="radio" name="${name}" value="${value}"> ${label}</label>`).join('')}</div></div>`}
+function marketingRow(item,i){return `<div class="sub"><div class="switchrow"><strong>${item.text}</strong><label class="switch"><input type="checkbox" name="mkt_${i}"><span></span></label></div>${item.evidence?`<div class="photoMount" data-photo-key="mkt_${i}"></div>`:''}</div>`}
+document.getElementById('marketingItems').innerHTML=marketing.map(marketingRow).join('');
+document.getElementById('tvItems').innerHTML=tvSections.map((sec,si)=>`<div class="tvsection"><h3>${sec.title}</h3>${sec.items.map((it,ii)=>radioBlock(`tv_${si}_${ii}`,it[0],it[1])).join('')}</div>`).join('');
+function serialize(){const d={}; new FormData(F).forEach((v,k)=>d[k]=v); F.querySelectorAll('input[type=checkbox]').forEach(x=>d[x.name]=x.checked); return d}
+function restore(d){if(!d)return; Object.entries(d).forEach(([k,v])=>{const els=F.elements[k]; if(!els)return;if(els instanceof RadioNodeList){[...els].forEach(e=>{if(e.type==='radio')e.checked=e.value===v;else if(e.type==='checkbox')e.checked=!!v})}else if(els.type==='checkbox')els.checked=!!v;else els.value=v??''}); updateUI()}
+function save(msg='Guardado localmente'){localStorage.setItem('dfp_draft_v1',JSON.stringify(serialize()));localStorage.setItem('dfp_saved_at',new Date().toISOString());S.textContent='🟢 '+msg+' · '+new Date().toLocaleTimeString('es-ES')}
+let t; F.addEventListener('input',()=>{clearTimeout(t);t=setTimeout(()=>save(),350)});F.addEventListener('change',()=>save());
+function updateUI(){document.getElementById('operadorBox').style.display=F.elements.televisado.checked?'block':'none';document.getElementById('hibridoBox').style.display=F.elements.hibrido.checked?'block':'none';document.getElementById('riegoSi').style.display=F.elements.acuerdo_riego.checked?'block':'none';document.getElementById('riegoNo').style.display=F.elements.acuerdo_riego.checked?'none':'block'}
+F.addEventListener('change',updateUI);
+document.getElementById('saveBtn').onclick=e=>{e.preventDefault();save('Borrador guardado')};
+function lines(){const d=serialize(), out=[];const add=(h,v)=>{if(v!==''&&v!==false&&v!=null)out.push(`${h}: ${v===true?'Sí':v}`)};out.push('INFORME DFP · PRIMERA FEDERACIÓN 2026/27','');add('Equipo local',d.equipo_local);add('Equipo visitante',d.equipo_visitante);add('Fecha',d.fecha);add('Inicio 1ª parte',d.inicio_1);add('Inicio 2ª parte',d.inicio_2);add('Contacto club local',d.contacto_local);add('Contacto club visitante',d.contacto_visitante);add('Partido televisado',d.televisado?'Sí':'No');if(d.televisado)add('Operador audiovisual',d.operador);add('Espectadores',d.espectadores);add('Espectadores visitantes',d.espectadores_visitantes);add('Resultado descanso',d.resultado_descanso);add('Resultado final',d.resultado_final);add('Resultado prórroga',d.resultado_prorroga);add('Tanda de penaltis',d.penaltis);out.push('\nESTADO DEL TERRENO DE JUEGO');add('Meteorología 24h',d.meteo_24);add('Previsión',d.meteo_hora);add('Dimensiones',d.largo&&d.ancho?`${d.largo} x ${d.ancho} m`:'');add('Clase de césped',d.clase_cesped);add('Césped híbrido',d.hibrido?'Sí':'No');if(d.hibrido)add('Tipo de hibridez',d.tipo_hibridez);add('Acuerdo sobre riego',d.acuerdo_riego?'Sí':'No');['cobertura','mala_hierba','clima','altura','marcaje','postes','redes_limpias','redes_estado','banderines','limpieza'].forEach(k=>add(k.replaceAll('_',' '),d[k]));add('Observaciones terreno',d.observaciones_terreno);out.push('\nMARKETING');marketing.forEach((x,i)=>{add(x.text,d['mkt_'+i]?'Sí':'No')});add('Observaciones Marketing',d.observaciones_marketing);out.push('\nPRODUCCIÓN AUDIOVISUAL');tvSections.forEach((sec,si)=>{out.push('\n'+sec.title);sec.items.forEach((it,ii)=>add(it[0],d[`tv_${si}_${ii}`]))});add('Observaciones Producción Audiovisual',d.observaciones_tv);out.push('\nOTRAS CUESTIONES RELEVANTES');out.push(d.otras_cuestiones||'Sin incidencias registradas.');return out.join('\n')}
+async function shareReport(){save('Informe final guardado');const text=lines();const blob=new Blob([text],{type:'text/plain;charset=utf-8'});const file=new File([blob],`DFP_${(F.elements.fecha.value||'partido')}_${(F.elements.equipo_local.value||'local').replaceAll(' ','-')}_${(F.elements.equipo_visitante.value||'visitante').replaceAll(' ','-')}.txt`,{type:'text/plain'});if(navigator.share&&navigator.canShare?.({files:[file]})){await navigator.share({title:'Informe DFP',text:'Enviar a fran.liarte@gmail.com',files:[file]})}else{const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=file.name;a.click();alert('Informe generado. En esta primera versión se ha descargado como texto. El siguiente bloque lo convertirá a PDF y habilitará compartir.') }}
+document.getElementById('confirmBtn').onclick=async e=>{e.preventDefault();if(confirm('¿Confirmar el informe y generar una copia para enviarla a fran.liarte@gmail.com? Los datos locales NO se borrarán.')){try{await shareReport()}catch(err){console.error(err)}}};
+try{restore(JSON.parse(localStorage.getItem('dfp_draft_v1')||'null'));const at=localStorage.getItem('dfp_saved_at');S.textContent=at?'🟢 Borrador recuperado · '+new Date(at).toLocaleTimeString('es-ES'):'🟢 Preparado · todavía sin datos';}catch(e){S.textContent='🟠 No se pudo recuperar el borrador'}updateUI();
+if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js').catch(console.error);
+
+// Borrado protegido del borrador completo
+const deleteDialog=document.getElementById('deleteDialog');
+const deleteWord=document.getElementById('deleteWord');
+const confirmDelete=document.getElementById('confirmDelete');
+document.getElementById('deleteBtn').onclick=e=>{
+  e.preventDefault();
+  deleteWord.value='';
+  confirmDelete.disabled=true;
+  deleteDialog.showModal();
+  setTimeout(()=>deleteWord.focus(),50);
+};
+document.getElementById('cancelDelete').onclick=e=>{e.preventDefault();deleteDialog.close();};
+deleteWord.addEventListener('input',()=>{confirmDelete.disabled=deleteWord.value!=='BORRAR';});
+confirmDelete.onclick=e=>{
+  e.preventDefault();
+  if(deleteWord.value!=='BORRAR') return;
+  localStorage.removeItem('dfp_draft_v1');
+  localStorage.removeItem('dfp_saved_at');
+  clearAllPhotos();
+  F.reset();
+  updateUI();
+  deleteDialog.close();
+  S.textContent='🟢 Todos los datos han sido borrados';
+  window.scrollTo({top:0,behavior:'smooth'});
+};
+
+
+// Fotografías offline: IndexedDB, comprimidas y fuera del PDF
+const PHOTO_DB='dfp_photos_v1', PHOTO_STORE='photos';
+let photoDB=null;
+function openPhotoDB(){return new Promise((resolve,reject)=>{const r=indexedDB.open(PHOTO_DB,1);r.onupgradeneeded=()=>{const db=r.result;if(!db.objectStoreNames.contains(PHOTO_STORE)){const st=db.createObjectStore(PHOTO_STORE,{keyPath:'id',autoIncrement:true});st.createIndex('section','section',{unique:false});}};r.onsuccess=()=>{photoDB=r.result;resolve(photoDB)};r.onerror=()=>reject(r.error);});}
+function photoTx(mode='readonly'){return photoDB.transaction(PHOTO_STORE,mode).objectStore(PHOTO_STORE)}
+function getPhotos(section){return new Promise((resolve,reject)=>{const r=photoTx().index('section').getAll(section);r.onsuccess=()=>resolve(r.result||[]);r.onerror=()=>reject(r.error)})}
+function addPhoto(section,blob){return new Promise((resolve,reject)=>{const r=photoTx('readwrite').add({section,blob,created:new Date().toISOString()});r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)})}
+function deletePhoto(id){return new Promise((resolve,reject)=>{const r=photoTx('readwrite').delete(id);r.onsuccess=()=>resolve();r.onerror=()=>reject(r.error)})}
+function clearAllPhotos(){if(!photoDB)return;try{photoTx('readwrite').clear()}catch(e){console.error(e)}}
+async function compressImage(file){const bmp=await createImageBitmap(file);const max=1600, scale=Math.min(1,max/Math.max(bmp.width,bmp.height));const c=document.createElement('canvas');c.width=Math.round(bmp.width*scale);c.height=Math.round(bmp.height*scale);c.getContext('2d').drawImage(bmp,0,0,c.width,c.height);bmp.close();return await new Promise(r=>c.toBlob(r,'image/jpeg',0.78));}
+function photoLabel(key){return key.startsWith('mkt_')?'Foto de Marketing':'Foto del apartado'}
+async function renderPhotos(section,mount){const list=mount.querySelector('.photoList'), count=mount.querySelector('.photoCount');const rows=await getPhotos(section);list.innerHTML='';count.textContent=rows.length?`${rows.length} foto${rows.length===1?'':'s'} adjunta${rows.length===1?'':'s'}`:'Sin fotos';for(const row of rows){const item=document.createElement('div');item.className='photoItem';const img=document.createElement('img');const url=URL.createObjectURL(row.blob);img.src=url;img.alt=photoLabel(section);img.onclick=()=>window.open(url,'_blank');const del=document.createElement('button');del.type='button';del.textContent='Eliminar';del.onclick=async()=>{if(confirm('¿Eliminar esta foto?')){URL.revokeObjectURL(url);await deletePhoto(row.id);await renderPhotos(section,mount);}};item.append(img,del);list.append(item)}}
+async function setupPhotoMount(mount){const section=mount.dataset.photoKey;mount.innerHTML=`<div class="photoBox"><label class="photoBtn">📷 Hacer / adjuntar foto<input type="file" accept="image/*" capture="environment"></label><span class="photoCount">Sin fotos</span><div class="photoList"></div></div>`;const input=mount.querySelector('input');input.onchange=async()=>{const file=input.files?.[0];if(!file)return;try{const blob=await compressImage(file);await addPhoto(section,blob);await renderPhotos(section,mount);S.textContent='🟢 Foto guardada localmente · '+new Date().toLocaleTimeString('es-ES');}catch(e){console.error(e);alert('No se pudo guardar la foto.');}finally{input.value='';}};await renderPhotos(section,mount)}
+(async()=>{try{await openPhotoDB();document.querySelectorAll('.photoMount').forEach(m=>setupPhotoMount(m));}catch(e){console.error(e);S.textContent='🟠 El navegador no pudo iniciar el almacén de fotografías';}})();
