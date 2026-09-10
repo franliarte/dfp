@@ -121,7 +121,7 @@ async function shareReport(){
 }
 document.getElementById('confirmBtn').onclick=async e=>{e.preventDefault();if(confirm('¿Confirmar el informe y generar una copia para enviarla a fran.liarte@gmail.com? Los datos locales NO se borrarán.')){try{await shareReport()}catch(err){console.error(err)}}};
 try{restore(JSON.parse(localStorage.getItem('dfp_draft_v1')||'null'));const at=localStorage.getItem('dfp_saved_at');S.textContent=at?'🟢 Borrador recuperado · '+new Date(at).toLocaleTimeString('es-ES'):'🟢 Preparado · todavía sin datos';}catch(e){S.textContent='🟠 No se pudo recuperar el borrador'}updateUI();
-if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js').catch(console.error);
+if('serviceWorker'in navigator){navigator.serviceWorker.register('./sw.js',{updateViaCache:'none'}).then(r=>r.update()).catch(console.error);}
 
 // Borrado protegido del borrador completo
 const deleteDialog=document.getElementById('deleteDialog');
